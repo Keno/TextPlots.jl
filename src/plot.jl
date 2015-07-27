@@ -1,13 +1,15 @@
+using Compat
+
 # Currently Julia gives false for isa([1,2,3], Vector{Real}), so doing manually.
 typealias RealVector Union(Vector{Int}, Vector{Float64})
 typealias RealMatrix Union(Matrix{Int}, Matrix{Float64})
-typealias PlotInputs Union(Vector{Function}, (RealVector, RealMatrix))
+typealias PlotInputs Union(Vector{Function}, @compat Tuple{RealVector, RealMatrix})
 
 SUPER = utf16("\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079")
 
 # Find magnitude of difference between 2 nums, as digits before/after decimal.
 function magnitude(num1::Real, num2::Real)
-    -iround(log10(abs(num2 - num1)))
+    -round(Integer,log10(abs(num2 - num1)))
 end
 
 # See if this float happens to match common uses of constants like n*pi.
@@ -16,9 +18,9 @@ function findsymbolic(num::Real)
 
     # Format strings for minus sign, superscript, multiples, and exponents.
     dash(x, super=false) = x >= 0 ? "" : super ? "⁻" : "-"
-    sup(x) = dash(x, true) * join([SUPER[d + 1] for d in reverse(digits(iround(abs(x))))])
-    multiple(x) = iround(x) == 0 ? "0" : iround(x) == 1 ? "" : "$(iround(x))"
-    topower(n, x) = iround(x) == 0 ? "1" : iround(x) == 1 ? n : "$n$(sup(x))"
+    sup(x) = dash(x, true) * join([SUPER[d + 1] for d in reverse(digits(round(Integer,abs(x))))])
+    multiple(x) = round(Integer,x) == 0 ? "0" : round(Integer,x) == 1 ? "" : "$(round(Integer,x))"
+    topower(n, x) = round(Integer,x) == 0 ? "1" : round(Integer,x) == 1 ? n : "$n$(sup(x))"
 
     # Split number between the absolute value and the minus sign, if any
     anum, sgn = abs(num), dash(num)
@@ -87,14 +89,16 @@ function plot(data::PlotInputs, start::Real=-10, stop::Real=10;
 
     # The unicode braille chars are conveniently structured to support bitwise
     # manipulation, so we can just OR specific bits to set that dot to filled.
-    grid = fill(char(gridlines ? 0x2812 : 0x2800), cols, rows)
+    grid = fill((@compat Char(gridlines ? 0x2812 : 0x2800)), cols, rows)
     left, right = sides = ((0, 1, 2, 6), (3, 4, 5, 7))
     function showdot(x, y)  # Assumes x & y are already scaled to the grid.
         invy = (rows - y)*0.9999
-        col, col2 = ifloor(x), ifloor(x*2)
-        row, row4 = ifloor(invy), ifloor(invy*4)
+        col, col2 = floor(Integer,x), floor(Integer,x*2)
+        row, row4 = floor(Integer,invy), floor(Integer,invy*4)
         # This does the bitwise OR to fill in a single dot out of the 8.
-        grid[col + 1, row + 1] |= 1 << sides[1 + (col2 & 1)][1 + (row4 & 3)]
+        grid[col + 1, row + 1] = @compat Char(
+            (@compat Int(grid[col + 1, row + 1])) |
+            (1 << sides[1 + (col2 & 1)][1 + (row4 & 3)]))
     end
 
     # If input is a function, sample it at each row & col to fill xvals & yvals.
